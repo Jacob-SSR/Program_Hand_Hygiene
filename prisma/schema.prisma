@@ -1,0 +1,83 @@
+// นิยามตาราง 4 ตัว ตรงกับ ER diagram
+// แก้ไฟล์นี้เมื่อไหร่ → ต้องรัน npx prisma generate ใหม่เสมอ
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma" // client ที่ generate จะไปกองที่นี่
+}
+
+datasource db {
+  provider = "mysql"
+  // Prisma 7 ไม่ใส่ url ตรงนี้แล้ว — ไปกำหนดที่ adapter ใน src/lib/prisma.ts
+}
+
+enum Role {
+  admin
+  user
+}
+
+// ---------- ผู้ใช้ระบบ (login) ----------
+model HygieneUser {
+  id           Int                  @id @default(autoincrement())
+  cid          String               @unique @db.Char(13) // เลข ปชช. = ชื่อผู้ใช้
+  pinHash      String               @map("pin_hash") @db.Char(64) // SHA-256 ของรหัส 4 หลัก
+  fullName     String               @map("full_name") @db.VarChar(150)
+  role         Role                 @default(user)
+  isActive     Boolean              @default(true) @map("is_active")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  observations HygieneObservation[]
+
+  @@map("hygiene_users") // ← ชื่อตารางจริงใน MySQL
+}
+
+// ---------- หน่วยเบิก ----------
+model HygieneUnit {
+  id           Int                  @id @default(autoincrement())
+  code         String               @unique @db.VarChar(10)
+  name         String               @db.VarChar(150)
+  isActive     Boolean              @default(true) @map("is_active")
+  personnel    HygienePersonnel[]
+  observations HygieneObservation[]
+
+  @@map("hygiene_units")
+}
+
+// ---------- บุคลากร (สำหรับประเมินรายบุคคล) ----------
+model HygienePersonnel {
+  id           Int                  @id @default(autoincrement())
+  cid          String?              @db.Char(13)
+  fullName     String               @map("full_name") @db.VarChar(150)
+  position     String?              @db.VarChar(100)
+  unitId       Int?                 @map("unit_id")
+  isActive     Boolean              @default(true) @map("is_active")
+  unit         HygieneUnit?         @relation(fields: [unitId], references: [id])
+  observations HygieneObservation[]
+
+  @@index([fullName])
+  @@map("hygiene_personnel")
+}
+
+// ---------- ข้อมูลการสังเกต (ตารางหลัก) ----------
+model HygieneObservation {
+  id          Int               @id @default(autoincrement())
+  fiscalYear  Int               @map("fiscal_year") @db.SmallInt // ปีงบ พ.ศ. เช่น 2569
+  quarter     Int               @db.TinyInt // 1=ต.ค.-ธ.ค. ... 4=ก.ค.-ก.ย.
+  obsNo       Int               @map("obs_no") // ครั้งที่สังเกต (รันต่อในไตรมาส+หน่วย)
+  obsDate     DateTime          @map("obs_date") @db.Date
+  unitId      Int               @map("unit_id")
+  staffType   String            @map("staff_type") @db.VarChar(50)
+  personnelId Int?              @map("personnel_id") // ว่างได้ = ไม่ระบุรายบุคคล
+  moment      Int               @db.TinyInt // 1-5
+  performed   Int               @db.TinyInt // 1=ปฏิบัติ 0=ไม่ปฏิบัติ
+  agent       String?           @db.VarChar(50) // น้ำยา (เมื่อปฏิบัติ)
+  createdBy   Int?              @map("created_by")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  unit        HygieneUnit       @relation(fields: [unitId], references: [id])
+  personnel   HygienePersonnel? @relation(fields: [personnelId], references: [id])
+  creator     HygieneUser?      @relation(fields: [createdBy], references: [id])
+
+  @@index([fiscalYear, quarter])
+  @@index([obsDate])
+  @@index([unitId])
+  @@map("hygiene_observations")
+}
