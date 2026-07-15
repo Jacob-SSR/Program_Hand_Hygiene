@@ -1,0 +1,9 @@
+services:
+  hand-hygiene:
+    build: .
+    container_name: hand-hygiene
+    ports:
+      - "3100:3000" 
+    env_file:
+      - .env          
+    restart: unless-stopped  
