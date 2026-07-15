@@ -7,7 +7,6 @@ export async function POST(req: NextRequest) {
   const { cid, pin, pin2, full_name } = await req.json();
   const name = String(full_name || "").trim();
 
-  // validate ทีละเงื่อนไข อ่านง่าย แก้ง่าย
   if (!name || name.length < 3)
     return NextResponse.json({ error: "กรุณากรอกชื่อ-สกุล" }, { status: 400 });
   if (!/^\d{13}$/.test(cid || ""))
@@ -26,7 +25,6 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
 
-  // กันสมัครซ้ำ
   const dup = await db().hygieneUser.findUnique({
     where: { cid },
     select: { id: true },
@@ -37,13 +35,12 @@ export async function POST(req: NextRequest) {
       { status: 409 },
     );
 
-  // เก็บรหัสเป็น hash — ในฐานข้อมูลไม่มีรหัสจริงให้ใครเห็น
   const pinHash = crypto.createHash("sha256").update(pin).digest("hex");
   const user = await db().hygieneUser.create({
     data: { cid, pinHash, fullName: name, role: "user" },
     select: { id: true, fullName: true, role: true },
   });
 
-  await createSession({ uid: user.id, name: user.fullName, role: user.role }); // สมัครปุ๊บ login ให้เลย
+  await createSession({ uid: user.id, name: user.fullName, role: user.role });
   return NextResponse.json({ ok: true, name: user.fullName });
 }
