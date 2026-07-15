@@ -1,4 +1,3 @@
-// ประเภทบุคลากรที่สังเกต
 export const STAFF_TYPES = [
   "แพทย์",
   "พยาบาล",
@@ -52,7 +51,7 @@ export const AGENTS = [
   "น้ำยาฆ่าเชื้ออื่นๆ",
 ] as const;
 // ค่าพิเศษ: เลือกแล้วต้องกรอกชื่อน้ำยาเอง
-export const AGENT_OTHER = "น้ำยาฆ่าเชื้ออื่นๆ"; 
+export const AGENT_OTHER = "น้ำยาฆ่าเชื้ออื่นๆ";
 
 export const QUARTERS = [
   { value: 1, label: "ไตรมาสที่ 1 (ต.ค.-ธ.ค.)" },

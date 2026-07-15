@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import {
-    AGENTS, AGENT_OTHER, currentFiscalYearBE, fmtThaiDate, MOMENTS, QUARTERS, STAFF_TYPES,
+    AGENTS, AGENT_OTHER, currentFiscalYearBE, fmtThaiDate, MOMENTS, QUARTERS,
+    STAFF_TYPES, STAFF_TYPE_POSITIONS,
     HAND_WASH_STEPS, HAND_WASH_NOTES,
 } from "@/lib/constants";
 
 type Unit = { id: number; code: string; name: string };
-type Person = { id: number; full_name: string; position: string | null; unit_name: string | null };
+type Person = { cid: string; full_name: string; position: string | null; unit_name: string | null };
 type Latest = { fiscal_year: number; quarter: number; obs_no: number; obs_date: string } | null;
 
 // วันนี้ในรูปแบบ YYYY-MM-DD ให้ <input type="date">
@@ -114,7 +115,9 @@ export default function RecordPage() {
                     unit_id: unit,
                     obs_date: obsDate,
                     staff_type: staffType,
-                    personnel_id: person?.id ?? null,
+                    personnel_cid: person?.cid ?? null,
+                    personnel_name: person?.full_name ?? null,
+                    personnel_position: person?.position ?? null,
                     moment,
                     performed: performed === "ปฏิบัติ",
                     agent: performed === "ปฏิบัติ" ? agent : null,
@@ -211,7 +214,11 @@ export default function RecordPage() {
                             <button
                                 type="button"
                                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                                onClick={() => { setShowSearch(true); setResults([]); setKw(""); }}
+                                onClick={() => {
+                                    setShowSearch(true);
+                                    setKw("");
+                                    fetch("/api/personnel").then((r) => r.json()).then(setResults);
+                                }}
                             >
                                 ค้นหาบุคลากร
                             </button>
@@ -355,7 +362,7 @@ export default function RecordPage() {
                                 </thead>
                                 <tbody>
                                     {results.map((p, i) => (
-                                        <tr key={p.id} className="cursor-pointer hover:bg-emerald-50" onClick={() => { setPerson(p); setShowSearch(false); }}>
+                                        <tr key={p.cid} className="cursor-pointer hover:bg-emerald-50" onClick={() => { setPerson(p); setShowSearch(false); }}>
                                             <td className="border border-slate-200 px-3 py-2">{i + 1}</td>
                                             <td className="border border-slate-200 px-3 py-2">{p.full_name}</td>
                                             <td className="border border-slate-200 px-3 py-2">{p.position || "-"}</td>

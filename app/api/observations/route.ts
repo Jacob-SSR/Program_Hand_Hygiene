@@ -86,7 +86,6 @@ export async function GET(req: NextRequest) {
 
 // POST /api/observations → บันทึกการสังเกต 1 กิจกรรม
 export async function POST(req: NextRequest) {
-  // ต้อง login เท่านั้น — และจำด้วยว่าใครบันทึก
   const s = await getSession();
   if (!s) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
@@ -96,46 +95,52 @@ export async function POST(req: NextRequest) {
   const unitId = Number(b.unit_id);
   const moment = Number(b.moment);
   const performed = b.performed ? 1 : 0;
-  const agentBase = performed ? String(b.agent || "") : null; // ตัวเลือกจาก dropdown
-  const agentOther = String(b.agent_other || "").trim(); // ชื่อที่กรอกเอง (กรณีอื่นๆ)
+  const agentBase = performed ? String(b.agent || "") : null;
+  const agentOther = String(b.agent_other || "").trim();
 
-  // validate ฝั่ง server เสมอ (ห้ามเชื่อหน้าเว็บอย่างเดียว)
   if (!fiscalYear || quarter < 1 || quarter > 4 || !unitId)
-    return NextResponse.json(
-      { error: "กรุณาเลือกปีงบประมาณ ไตรมาส และหน่วยเบิก" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "กรุณาเลือกปีงบประมาณ ไตรมาส และหน่วยเบิก" }, { status: 400 });
   if (!STAFF_TYPES.includes(b.staff_type))
-    return NextResponse.json(
-      { error: "ประเภทบุคลากรไม่ถูกต้อง" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "ประเภทบุคลากรไม่ถูกต้อง" }, { status: 400 });
   if (moment < 1 || moment > 5)
     return NextResponse.json({ error: "Moment ไม่ถูกต้อง" }, { status: 400 });
   if (performed && !(AGENTS as readonly string[]).includes(agentBase ?? ""))
-    return NextResponse.json(
-      { error: "กรุณาเลือกน้ำยาที่ใช้ทำความสะอาดมือ" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "กรุณาเลือกน้ำยาที่ใช้ทำความสะอาดมือ" }, { status: 400 });
   if (performed && agentBase === AGENT_OTHER && !agentOther)
-    return NextResponse.json(
-      { error: "กรุณาระบุชื่อน้ำยาฆ่าเชื้ออื่นๆ" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "กรุณาระบุชื่อน้ำยาฆ่าเชื้ออื่นๆ" }, { status: 400 });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(b.obs_date || ""))
-    return NextResponse.json(
-      { error: "วันที่บันทึกไม่ถูกต้อง" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "วันที่บันทึกไม่ถูกต้อง" }, { status: 400 });
 
-  // ประกอบค่าที่จะเก็บลงฐาน: เลือกอื่นๆ → "อื่นๆ: ชื่อที่กรอก"
   const agent = !performed
     ? null
     : agentBase === AGENT_OTHER
       ? `อื่นๆ: ${agentOther}`
       : agentBase;
 
-  // หาครั้งที่สังเกตถัดไป (ตรรกะเดียวกับ next_no ข้างบน)
+  // ประเมินรายบุคคล: lazy copy จาก ppchos.users → hygiene_personnel
+  let personnelId: number | null = null;
+  if (b.personnel_cid) {
+    const cid = String(b.personnel_cid);
+    const fullName = String(b.personnel_name || "").trim();
+    if (!fullName)
+      return NextResponse.json({ error: "ข้อมูลบุคลากรไม่ครบถ้วน" }, { status: 400 });
+
+    const found = await db().hygienePersonnel.findFirst({ where: { cid } });
+    if (found) {
+      // อัปเดตชื่อ/ตำแหน่งให้ตรงกับ HOSxP ล่าสุด
+      const updated = await db().hygienePersonnel.update({
+        where: { id: found.id },
+        data: { fullName, position: b.personnel_position ?? found.position },
+      });
+      personnelId = updated.id;
+    } else {
+      const created = await db().hygienePersonnel.create({
+        data: { cid, fullName, position: b.personnel_position ?? null },
+      });
+      personnelId = created.id;
+    }
+  }
+
   const agg = await db().hygieneObservation.aggregate({
     where: { fiscalYear, quarter, unitId },
     _max: { obsNo: true },
@@ -150,11 +155,11 @@ export async function POST(req: NextRequest) {
       obsDate: new Date(b.obs_date),
       unitId,
       staffType: b.staff_type,
-      personnelId: b.personnel_id ? Number(b.personnel_id) : null,
+      personnelId,
       moment,
       performed,
       agent,
-      createdBy: s.uid, // ใครบันทึก มาจาก session
+      createdBy: s.uid,
     },
   });
   return NextResponse.json({ ok: true, obs_no: obsNo });
