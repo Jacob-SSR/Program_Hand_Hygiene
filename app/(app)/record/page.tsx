@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
     AGENTS, currentFiscalYearBE, fmtThaiDate, MOMENTS, QUARTERS, STAFF_TYPES,
     HAND_WASH_STEPS, HAND_WASH_NOTES,
@@ -50,29 +50,38 @@ export default function RecordPage() {
     const [saving, setSaving] = useState(false);
     const [showSteps, setShowSteps] = useState(false);   // กล่องความรู้ 7 ขั้นตอน
 
+    // ตัวสะกิด: บันทึกสำเร็จเมื่อไหร่ +1 เพื่อให้ effect โหลด latest + next_no ใหม่
+    const [refresh, setRefresh] = useState(0);
+
     // ---- popup ค้นหาบุคลากร ----
     const [showSearch, setShowSearch] = useState(false);
     const [kw, setKw] = useState("");
     const [results, setResults] = useState<Person[]>([]);
 
-    // โหลดหน่วยเบิก + ข้อมูลบันทึกล่าสุด ครั้งเดียวตอนเปิดหน้า
+    // โหลดหน่วยเบิก ครั้งเดียวตอนเปิดหน้า
     useEffect(() => {
         fetch("/api/units").then((r) => r.json()).then(setUnits);
     }, []);
-    const loadLatest = useCallback(() => {
-        fetch("/api/observations?latest=1").then((r) => r.json()).then(setLatest);
-    }, []);
-    useEffect(() => { loadLatest(); }, [loadLatest]);
 
-    // เลือกปีงบ+ไตรมาส+หน่วยครบเมื่อไหร่ → ถามเลขครั้งที่สังเกตทันที
-    const loadNextNo = useCallback(async () => {
-        if (!year || !quarter || !unit) { setNextNo(null); return; }
+    // โหลดข้อมูลบันทึกล่าสุด (ตอนเปิดหน้า + หลังบันทึกสำเร็จ)
+    useEffect(() => {
+        let alive = true;
+        fetch("/api/observations?latest=1")
+            .then((r) => r.json())
+            .then((d) => { if (alive) setLatest(d); });
+        return () => { alive = false; };
+    }, [refresh]);
+
+    // เลือกปีงบ+ไตรมาส+หน่วยครบ → ถามเลขครั้งที่สังเกต (และโหลดใหม่หลังบันทึก)
+    useEffect(() => {
+        if (!year || !quarter || !unit) return;   // ไม่ครบ = ไม่ทำอะไร (ค่า null ถูกเคลียร์ที่ onChange แล้ว)
+        let alive = true;
         const sp = new URLSearchParams({ next_no: "1", year, quarter, unit });
-        const res = await fetch(`/api/observations?${sp}`);
-        const data = await res.json();
-        setNextNo(data.next_no);
-    }, [year, quarter, unit]);
-    useEffect(() => { loadNextNo(); }, [loadNextNo]);
+        fetch(`/api/observations?${sp}`)
+            .then((r) => r.json())
+            .then((d) => { if (alive) setNextNo(d.next_no); });
+        return () => { alive = false; };
+    }, [year, quarter, unit, refresh]);
 
     async function searchPersonnel() {
         const sp = new URLSearchParams();
@@ -117,8 +126,7 @@ export default function RecordPage() {
             }
             setMsg({ type: "ok", text: `บันทึกข้อมูลสำเร็จ (ครั้งที่สังเกต ${data.obs_no})` });
             clearObservation();
-            loadNextNo();   // เลขครั้งถัดไปขยับ
-            loadLatest();   // หัวฟอร์มอัปเดต
+            setRefresh((n) => n + 1);   // สะกิดให้ effect โหลด latest + next_no ใหม่
         } finally {
             setSaving(false);
         }
@@ -140,14 +148,22 @@ export default function RecordPage() {
                     {/* ปีงบประมาณ + ไตรมาสที่ แถวเดียวกัน */}
                     <div className="grid items-start gap-2 py-2 sm:grid-cols-[160px_1fr_120px_1fr]">
                         <div className="pt-2 text-sm font-bold text-slate-700">ปีงบประมาณ</div>
-                        <select className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm" value={year} onChange={(e) => setYear(e.target.value)}>
+                        <select
+                            className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            value={year}
+                            onChange={(e) => { setYear(e.target.value); setNextNo(null); }}
+                        >
                             <option value="">----กรุณาเลือก----</option>
                             {Array.from({ length: 3 }, (_, i) => fyNow - i).map((y) => (
                                 <option key={y} value={y}>ปีงบ {y}</option>
                             ))}
                         </select>
                         <div className="pt-2 text-sm font-bold text-slate-700 sm:text-center">ไตรมาสที่</div>
-                        <select className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm" value={quarter} onChange={(e) => setQuarter(e.target.value)}>
+                        <select
+                            className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            value={quarter}
+                            onChange={(e) => { setQuarter(e.target.value); setNextNo(null); }}
+                        >
                             <option value="">----กรุณาเลือก----</option>
                             {QUARTERS.map((qt) => (
                                 <option key={qt.value} value={qt.value}>{qt.label}</option>
@@ -156,7 +172,11 @@ export default function RecordPage() {
                     </div>
 
                     <Row label="หน่วยเบิก">
-                        <select className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm" value={unit} onChange={(e) => setUnit(e.target.value)}>
+                        <select
+                            className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            value={unit}
+                            onChange={(e) => { setUnit(e.target.value); setNextNo(null); }}
+                        >
                             <option value="">----กรุณาเลือก----</option>
                             {units.map((u) => (
                                 <option key={u.id} value={u.id}>{u.code} - {u.name}</option>
