@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, toISODate } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { STAFF_TYPES, AGENTS } from "@/lib/constants";
-import type { Prisma } from "@/generated/prisma/client"; // ← เพิ่มบรรทัดนี้
+import { STAFF_TYPES, AGENTS, AGENT_OTHER } from "@/lib/constants";
+import type { Prisma } from "@/generated/prisma/client";
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ next_no: (agg._max.obsNo ?? 0) + 1 });
   }
 
-  // เดิม:  const where: any = {};
+  // โหมด 3: ?year=2569&month=7 → รายการข้อมูล (หน้ารายงานแยกตามเดือน)
   const where: Prisma.HygieneObservationWhereInput = {};
   const yearBE = sp.get("year") ? Number(sp.get("year")) : null;
   const month = sp.get("month") ? Number(sp.get("month")) : null;
@@ -96,7 +96,8 @@ export async function POST(req: NextRequest) {
   const unitId = Number(b.unit_id);
   const moment = Number(b.moment);
   const performed = b.performed ? 1 : 0;
-  const agent = performed ? String(b.agent || "") : null; // ไม่ปฏิบัติ = ไม่มีน้ำยา
+  const agentBase = performed ? String(b.agent || "") : null; // ตัวเลือกจาก dropdown
+  const agentOther = String(b.agent_other || "").trim(); // ชื่อที่กรอกเอง (กรณีอื่นๆ)
 
   // validate ฝั่ง server เสมอ (ห้ามเชื่อหน้าเว็บอย่างเดียว)
   if (!fiscalYear || quarter < 1 || quarter > 4 || !unitId)
@@ -111,9 +112,14 @@ export async function POST(req: NextRequest) {
     );
   if (moment < 1 || moment > 5)
     return NextResponse.json({ error: "Moment ไม่ถูกต้อง" }, { status: 400 });
-  if (performed && !(AGENTS as readonly string[]).includes(agent ?? ""))
+  if (performed && !(AGENTS as readonly string[]).includes(agentBase ?? ""))
     return NextResponse.json(
       { error: "กรุณาเลือกน้ำยาที่ใช้ทำความสะอาดมือ" },
+      { status: 400 },
+    );
+  if (performed && agentBase === AGENT_OTHER && !agentOther)
+    return NextResponse.json(
+      { error: "กรุณาระบุชื่อน้ำยาฆ่าเชื้ออื่นๆ" },
       { status: 400 },
     );
   if (!/^\d{4}-\d{2}-\d{2}$/.test(b.obs_date || ""))
@@ -121,6 +127,13 @@ export async function POST(req: NextRequest) {
       { error: "วันที่บันทึกไม่ถูกต้อง" },
       { status: 400 },
     );
+
+  // ประกอบค่าที่จะเก็บลงฐาน: เลือกอื่นๆ → "อื่นๆ: ชื่อที่กรอก"
+  const agent = !performed
+    ? null
+    : agentBase === AGENT_OTHER
+      ? `อื่นๆ: ${agentOther}`
+      : agentBase;
 
   // หาครั้งที่สังเกตถัดไป (ตรรกะเดียวกับ next_no ข้างบน)
   const agg = await db().hygieneObservation.aggregate({

@@ -41,7 +41,18 @@ export const MOMENTS: { value: number; label: string; detail: string }[] = [
   },
 ];
 
-export const AGENTS = ["Alcohol Hand Rub", "สบู่", "CHG"] as const;
+// ประเภทผลิตภัณฑ์ทำความสะอาดมือ (ตามมาตรฐาน WHO / IC)
+export const AGENTS = [
+  "Alcohol Hand Rub",
+  "สบู่ธรรมดา (Plain soap)",
+  "CHG",
+  "Chlorhexidine + Alcohol",
+  "Povidone-iodine",
+  "Triclosan",
+  "น้ำยาฆ่าเชื้ออื่นๆ",
+] as const;
+// ค่าพิเศษ: เลือกแล้วต้องกรอกชื่อน้ำยาเอง
+export const AGENT_OTHER = "น้ำยาฆ่าเชื้ออื่นๆ"; 
 
 export const QUARTERS = [
   { value: 1, label: "ไตรมาสที่ 1 (ต.ค.-ธ.ค.)" },

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-    AGENTS, currentFiscalYearBE, fmtThaiDate, MOMENTS, QUARTERS, STAFF_TYPES,
+    AGENTS, AGENT_OTHER, currentFiscalYearBE, fmtThaiDate, MOMENTS, QUARTERS, STAFF_TYPES,
     HAND_WASH_STEPS, HAND_WASH_NOTES,
 } from "@/lib/constants";
 
@@ -44,6 +44,7 @@ export default function RecordPage() {
     const [moment, setMoment] = useState("");
     const [performed, setPerformed] = useState("");
     const [agent, setAgent] = useState("");
+    const [agentOther, setAgentOther] = useState("");   // ชื่อน้ำยาที่กรอกเอง
 
     // ---- สถานะหน้าจอ ----
     const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
@@ -117,6 +118,7 @@ export default function RecordPage() {
                     moment,
                     performed: performed === "ปฏิบัติ",
                     agent: performed === "ปฏิบัติ" ? agent : null,
+                    agent_other: performed === "ปฏิบัติ" && agent === AGENT_OTHER ? agentOther.trim() : null,
                 }),
             });
             const data = await res.json();
@@ -126,6 +128,7 @@ export default function RecordPage() {
             }
             setMsg({ type: "ok", text: `บันทึกข้อมูลสำเร็จ (ครั้งที่สังเกต ${data.obs_no})` });
             clearObservation();
+            setAgentOther("");
             setRefresh((n) => n + 1);   // สะกิดให้ effect โหลด latest + next_no ใหม่
         } finally {
             setSaving(false);
@@ -255,17 +258,28 @@ export default function RecordPage() {
                     </Row>
 
                     <Row label="น้ำยาที่ใช้ล้างมือ">
-                        <select
-                            className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
-                            value={agent}
-                            onChange={(e) => setAgent(e.target.value)}
-                            disabled={performed !== "ปฏิบัติ"}
-                        >
-                            <option value="">----กรุณาเลือก----</option>
-                            {AGENTS.map((a) => (
-                                <option key={a} value={a}>{a}</option>
-                            ))}
-                        </select>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <select
+                                className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
+                                value={agent}
+                                onChange={(e) => { setAgent(e.target.value); if (e.target.value !== AGENT_OTHER) setAgentOther(""); }}
+                                disabled={performed !== "ปฏิบัติ"}
+                            >
+                                <option value="">----กรุณาเลือก----</option>
+                                {AGENTS.map((a) => (
+                                    <option key={a} value={a}>{a}</option>
+                                ))}
+                            </select>
+                            {agent === AGENT_OTHER && (
+                                <input
+                                    className="w-full max-w-xs rounded-lg border border-amber-400 bg-amber-50 px-3 py-2 text-sm"
+                                    placeholder="ระบุชื่อน้ำยา เช่น Hibiscrub"
+                                    value={agentOther}
+                                    onChange={(e) => setAgentOther(e.target.value)}
+                                    autoFocus
+                                />
+                            )}
+                        </div>
                     </Row>
                 </div>
 
