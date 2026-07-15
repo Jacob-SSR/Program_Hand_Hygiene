@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
     AGENTS, AGENT_OTHER, currentFiscalYearBE, fmtThaiDate, MOMENTS, QUARTERS,
-    STAFF_TYPES, STAFF_TYPE_POSITIONS,
+    STAFF_TYPES,
     HAND_WASH_STEPS, HAND_WASH_NOTES,
 } from "@/lib/constants";
 
