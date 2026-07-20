@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { NavLinks, LogoutButton, MobileNav } from "./nav";
+import { ToastProvider } from "./toast";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
     const session = await getSession(); // อ่านชื่อจาก JWT cookie
@@ -28,7 +29,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 </aside>
 
                 {/* children = หน้าที่กำลังเปิดอยู่ จะถูกเสียบตรงนี้ */}
-                <main className="w-full min-w-0 p-4 md:p-6">{children}</main>
+                <main className="w-full min-w-0 p-4 md:p-6">
+                    <ToastProvider>{children}</ToastProvider>
+                </main>
             </div>
         </div>
     );

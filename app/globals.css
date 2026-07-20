@@ -16,3 +16,15 @@ body {
   main { padding: 0 !important; }
   body { background: white !important; }
 }
+
+/* อนิเมชันของ toast แจ้งเตือน (ดู app/(app)/toast.tsx) */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(1.5rem); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(1.5rem); }
+}
+.animate-toast-in { animation: toast-in 0.25s ease-out; }
+.animate-toast-out { animation: toast-out 0.3s ease-in forwards; }
